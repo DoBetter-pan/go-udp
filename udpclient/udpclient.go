@@ -43,7 +43,7 @@ func (data *event) encode(enc string) (string, error) {
     }
 }
 
-func handleCommandLine() *params {
+func handleCommandLine() (*params, []string ){
     p := params{}
 
     flag.StringVar(&p.host, "host", "127.0.0.1", "host ot send udp to")
@@ -54,11 +54,13 @@ func handleCommandLine() *params {
     flag.StringVar(&p.message, "message", "hello world", "message")
     flag.Parse()
 
-    return &p
+    messages := flag.Args()
+
+    return &p, messages
 }
 
 func main() {
-    p := handleCommandLine()
+    p, messages := handleCommandLine()
     ip := net.ParseIP(p.host)
     srcAddr := &net.UDPAddr{IP: []byte{0, 0, 0, 0}, Port: 0}
     dstAddr := &net.UDPAddr{IP: ip, Port: p.port}
@@ -67,21 +69,23 @@ func main() {
     //conn, err := net.DialUDP("udp", srcAddr, dstAddr)
     if err != nil {
         fmt.Println("failed to dial udp server:", err)
+        return
     }
     defer conn.Close()
 
-
-    encoder :=  event{p.maintype, p.subtype, p.message}
-    message, err := encoder.encode(p.enc)
-    if err == nil {
-        n, err := conn.WriteToUDP([]byte(message), dstAddr)
-        if err != nil {
-            fmt.Println("failed to send udp server:", err)
+    for _, msg := range messages {
+        encoder :=  event{p.maintype, p.subtype, msg}
+        message, err := encoder.encode(p.enc)
+        if err == nil {
+            n, err := conn.WriteToUDP([]byte(message), dstAddr)
+            if err != nil {
+                fmt.Println("failed to send udp server:", err)
+            } else {
+                fmt.Printf("send %d data to udp server:%s\n", n, message)
+            }
         } else {
-            fmt.Printf("send %d data to udp server:%s\n", n, message)
+            fmt.Println("failed to encode the data:", err)
         }
-    } else {
-        fmt.Println("failed to encode the data:", err)
     }
 }
 
